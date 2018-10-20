@@ -6,10 +6,17 @@
 
 
 struct MachineNode{
-    int id;     //省市id
+    int pid;     //省市id
+    int mid;     //机器di
     string ip;  //主机IP
     int stat;   //主机服务状态，HTTP状态码，正常，繁忙，无法连接,无请求资源等
     int doing;   //工作状态
+
+    void print() const{
+        char buf[256];
+        sprintf(buf,"pid=%d mid=%d ip=%s stat=%d doing=%d",pid,mid,ip.data(),stat,doing);
+        LOG(INFO,SUCCESS,buf);
+    }
 };
 
 /**
@@ -20,21 +27,97 @@ struct ProvinceServerState{
 
     int aliveNum;   //可用主机数,服务器状态正常
     int freeNum;    //空闲的机器数
-
+    queue<int> freeMachinesIndex;  //空闲机器的索引队列，
+                                   //当一个省市的机器数过多时，能够快速获取空闲的机器，避免遍历整个机器列表
     vector<MachineNode>  machines;  //机器
 
     /**
      * @brief print
      * 打印状态信息
      */
-    void print(){
-         string info ="aliveNum="+aliveNum+" freeNum="+freeNum;
+    void print() const{
+        char buf[256];
+        sprintf(buf,"aliveNum=%d freeNum=%d",aliveNum,freeNum);
+        LOG(INFO,SUCCESS,buf);
         for(int i=0;i<machines.size();i++){
-            info += ",ip="+machines[i].ip+" stat="+machines[i].stat+" doing="+machines[i].doing;
-            LOG(INFO,SUCCESS,info);
+            machines[i].print();
         }
     }
 
+    /**
+     * @brief getFreeMachine
+     * 取得一个空闲的机器
+     * @param m [out] 空闲机器
+     * @return
+     */
+    int getFreeMachine(MachineNode * m){
+        int ret = SUCCESS;
+        //检查
+        if(aliveNum==0||freeNum==0||
+                freeMachinesIndex.empty()){
+            ret = ERR_QUEUE_EMPTY;
+        }else{
+            m = &machines[freeMachinesIndex.front()];
+            if (m->doing){
+                ret = ERR_WRONG_STASTE;
+                LOG(WARN,ret,"机器工作状态错误，并未在空闲状态");
+            }
+            //不管是否工作状态正常，都从空闲队列中移除
+            //移除索引
+            freeMachinesIndex.pop();
+            freeNum--;
+            //设置机器状态被使用
+            m->doing=1;
+        }
+        return ret;
+    }
+    /**
+     * @brief pushMachine
+     * 将一台机器忙碌设置为空闲
+     * @param mid
+     * @return
+     */
+    int setFreeMachine(int mid){
+        int ret = SUCCESS;
+        //检查mid合法性
+        if (mid>=machines.size()||mid <0){
+            ret = ERR_ILLEGAL_ID;
+            LOG(ERR,ret,"机器id非法！");
+        }else if (!machines[mid].doing){
+            ret = ERR_WRONG_STASTE;
+            LOG(WARN,ret,"机器工作状态错误，并未在工作状态");
+        }else{
+            freeMachinesIndex.push(mid);
+            freeNum++;
+            //设置机器状态为空闲
+            machines[mid].doing=0;
+        }
+
+        return ret;
+    }
+    /**
+     * @brief remove
+     * 将一台问题机器移除
+     * @param mid
+     * @return
+     */
+    int removeMachine(int mid){
+        int ret = SUCCESS;
+        //检查mid合法性
+        if (mid>=machines.size()||mid <0){
+            ret = ERR_ILLEGAL_ID;
+            LOG(ERR,ret,"机器id非法！");
+        }else if (machines[mid].stat == MACHINE_NORMAL){
+            aliveNum--;
+            machines[mid].doing=0;
+            machines[mid].stat=MACHINE_FAIL;
+        }else{
+            ret = ERR_WRONG_STASTE;
+            LOG(WARN,ret,"机器状态错误，并未在正常状态");
+        }
+
+        return ret;
+    }
 };
 
 
@@ -61,9 +144,10 @@ struct ProvinceServerNode{
      * @brief print
      * 打印节点信息
      */
-    void print(){
-        string info = "id="+id+" order="+order;
-        LOG(INFO,SUCCESS,info);
+    void print() const {
+        char buf[256];
+        sprintf(buf,"id=%d order=%d",id,order);
+        LOG(INFO,SUCCESS,buf);
     }
 };
 

@@ -29,6 +29,9 @@ private:
     //为了使工作线程无状态，减少耦合，建立已经完成任务队列，处理后续工作
     queue<DoneTask> doneTaskQueue;  //已完成任务队列
 
+    uint64_t startTime; //下载开始时间
+    uint64_t timeOut;   //下载超时时间，超时后停止自动退出下载
+
 public:
 
     /**
@@ -45,7 +48,7 @@ public:
      * @param m [out]
      * @return 错误码
      */
-    int popMachineNode(MachineNode &m);
+    int popMachineNode(MachineNode *m);
 
     int pushMachineNode();
 
@@ -56,14 +59,49 @@ public:
      * @return
      */
     int addTask();
+    /**
+     * @brief handleDoneTask
+     * 处理完成的任务，修改机器状态
+     * @return
+     */
+    int handleDoneTask();
 
     /**
-     * @brief initFreeServerPriorityQueue
-     * 初始化空闲队列
+     * @brief hasRemainTask
+     * 检查是否还有剩余任务
+     * @return
+     */
+    bool hasRemainTask(){
+        return remainTask.len!=0||!redoTaskQueue.empty();
+    }
+
+    /**
+     * @brief hasFreeServer
+     * 检查是否有空闲服务节点
+     * @return
+     */
+    bool hasFreeServer(){
+        return !freeServerPriorityQueue.empty();
+    }
+    /**
+     * @brief checkDownException
+     * 下载异常检查
+     * @return
+     */
+    bool checkDownException(){
+        bool ret = false;
+        //检查是否所有服务节点都已经不可服务
+        return ret;
+    }
+
+    /**
+     * @brief initDownLoder
+     * 初始化下载器
      * @param psv [in] 省市服务节点数组
+     * @param pss [in] 省市服务节点状态数组
      * @return 错误码
      */
-    int initFreeServerPriorityQueue(vector<ProvinceServerNode> & psv);
+    int initDownLoder(vector<ProvinceServerNode> & psv, vector<ProvinceServerState> &pss);
 
     /**
      * @brief getResourcesInfo
@@ -81,7 +119,14 @@ public:
      */
     int DownLoad(string url);
 
-
+    /**
+     * @brief clear
+     * 清理环境
+     */
+    void clear(){
+        //TODO
+        //清理下载器的各种状态，释放资源等等
+    }
 
 };
 

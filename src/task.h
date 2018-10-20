@@ -5,13 +5,15 @@
 
 
 struct TaskReqestRange{
-    int start;
-    int len;
+    uint64_t start;
+    uint64_t len;
 };
 
 struct DoneTask{
-    string ip;  //完成的机器ip
-    TaskReqestRange trr;
+    int pid;    //省市id
+    int mid;    //机器id
+
+    TaskReqestRange trr;    //完成的任务范围
 };
 
 
@@ -27,7 +29,7 @@ struct TaskWorker{
     char *buf;  //分片数据内容
     HttpClient *httpClient;   //尝试复用已建立的的HttpClient,避免重复建立tcp连接的开销
 
-    TaskWorker(string url,int start,int len,HttpClient hc){
+    TaskWorker(string url,int start,int len,HttpClient* hc){
         this->url=url;
         this->start=start;
         this->len=len;
@@ -46,7 +48,7 @@ struct TaskWorker{
             LOG(ERR,ret,"HttpClient 为空");
         }else if (SUCCESS!=(ret = httpClient->get(url,start,len,buf))){
             LOG(ERR,ret,"获取数据失败");
-        }else if (SUCCESS!=(ret = Store(buf))){
+        }else if (SUCCESS!=(ret = store(buf))){
             LOG(ERR,ret,"本地写数据失败");
         }else{
             LOG(INFO,ret,"完成一个任务");

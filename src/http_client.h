@@ -6,6 +6,7 @@
 /**
  * @brief The HttpClient struct
  * 伪http客户端，当前并未实现真正的HttpClient
+ * 可调用libcurl等库
  */
 struct HttpClient{
     int ip;         //连接ip
