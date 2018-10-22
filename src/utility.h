@@ -2,6 +2,8 @@
 #define UTILITY_H_
 
 #include "province_server_node.h"
+#include "task.h"
+#include "thread_safe_queue.h"
 
 /**
  * @brief init_provinces_neighbor_ralation
@@ -28,6 +30,17 @@ int bfs_province_access_order(vector<vector<int>> &pnr,queue<int> &q,vector<Prov
  * @return 错误码
  */
 int get_province_access_order(vector<vector<int>> &pnr, int start,vector<ProvinceServerNode> &orders);
+
+
+/**
+ * @brief down_run
+ *  下载线程执行函数
+ * @param worker [in] 下载工作器
+ * @param doneQueue [inout] 完成队列
+ * @param doneTaskNum [inout] 完成成功的任务数
+ * @return
+ */
+int down_run(TaskWorker worker, threadSafeQueue<DoneTask> & doneQueue, atomic<uint64_t> &doneTaskNum);
 
 
 #endif // UTILITY_H_

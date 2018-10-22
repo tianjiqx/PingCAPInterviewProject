@@ -1,5 +1,7 @@
 #include "down_loder.h"
-
+#include<thread>
+#include<math.h>
+#include<utility.h>
 
 int DownLoder::produceTaskReqestRange(TaskReqestRange & trr){
     int ret = SUCCESS;
@@ -18,7 +20,7 @@ int DownLoder::produceTaskReqestRange(TaskReqestRange & trr){
     return ret;
 }
 
-int DownLoder::popMachineNode(MachineNode * m){
+int DownLoder::popMachineNode(MachineNode *& m){
     int ret = SUCCESS;
     if (freeServerPriorityQueue.empty()){
         ret = ERR_QUEUE_EMPTY;
@@ -51,8 +53,6 @@ int DownLoder::popMachineNode(MachineNode * m){
                     succ=false;
                 }
                 //打印服务节点基本信息
-                psn.print();
-                //打印服务节点状态
                 s.print();
                 //加入到busyMap
                 busyServerMap.insert(PSMap::value_type(psn.id,psn));
@@ -68,22 +68,16 @@ int DownLoder::popMachineNode(MachineNode * m){
     return ret;
 }
 
-int DownLoder::initDownLoder(vector<ProvinceServerNode> & psv,vector<ProvinceServerState> &pss){
+int DownLoder::initDownLoder(vector<ProvinceServerState> &pss){
     int ret = SUCCESS;
-
-    if (psv.size()!=pss.size()){
-        ret = ERROR;
-        LOG(ERR,ret,"初始化信息错误");
-    }else{
-        //初始化空闲队列
-        for(int i=0;i<psv.size();i++){
-            freeServerPriorityQueue.push(psv[i]);
-        }
-        //初始化服务节点的状态
-        for(int i=0;i<pss.size();i++){
-            serverStates.push_back(pss[i]);
-        }
-        //初始化线程池
+    LOG(INFO,ret,"初始化下载器");
+    //初始化空闲队列
+    for(int i=0;i<pss.size();i++){
+        freeServerPriorityQueue.push(pss[i].ps);
+    }
+    //初始化服务节点的状态
+    for(int i=0;i<pss.size();i++){
+        serverStates.push_back(pss[i]);
     }
 
     return ret;
@@ -96,14 +90,47 @@ int DownLoder::getResourcesInfo(string url){
 
     remainTask.start=0;
     //假设资源2GB
-    remainTask.len=2*1024*1024*1024L;   //2GB
+    //remainTask.len=2*1024*1024*1024L;   //2GB
+    remainTask.len=2*1024*1024L;   //2MB
 
+    //初始化任务数
+    taskNum=ceil(remainTask.len*1.0/MAX_HTTP_BODY_SIZE);
+    char buf[100];
+    sprintf(buf,"任务数%d",taskNum);
+    LOG(INFO,ret,buf);
+
+    return ret;
+}
+
+int DownLoder::merge(){
+    int ret = SUCCESS;
+    //TODO
+    //合并临时文件
+    return ret;
+}
+
+int DownLoder::getHttpclient(string ip,HttpClient *& http){
+    int ret=SUCCESS;
+    HCMap::iterator it;
+    if ((it=httpClientMap.find(ip))!=httpClientMap.end()){
+        http=it->second;
+    }
+    else{
+        http = new HttpClient();
+        http->ip=ip;
+        //根据order，设置一个伪下载时间
+        int pid,mid,order;
+        ip2id(ip,pid,mid);
+        order = serverStates[pid].ps.order+1;
+        http->downTime=order/5*100+order%5;
+
+        httpClientMap.insert(HCMap::value_type(ip,http));
+    }
     return ret;
 }
 
 int DownLoder::addTask(){
     int ret = SUCCESS;
-
     //获取空闲机器
     MachineNode * m = NULL;
     ret = popMachineNode(m);
@@ -111,7 +138,7 @@ int DownLoder::addTask(){
         LOG(INFO,ret,"无多余可服务机器");
         ret = SUCCESS;
     }else if(ret!=SUCCESS){
-        LOG(INFO,ret,"获取可服务机器出错");
+        LOG(ERR,ret,"获取可服务机器出错");
     }else{
         TaskReqestRange trr;
         ret = produceTaskReqestRange(trr);
@@ -121,9 +148,21 @@ int DownLoder::addTask(){
         }
         else if (SUCCESS!=ret){
             LOG(INFO,ret,"获取请求范围失败");
-        }
-        else{
-            //追加任务到线程池
+        }else{
+            TaskWorker worker(url,m->pid,m->mid,trr);
+            //根据ip获取一个HttpClient，复用未关闭的http连接客户端
+            HttpClient * http=NULL;
+            if (SUCCESS!=(ret=getHttpclient(ips[m->pid],http))){
+
+            }
+            else{
+                worker.httpClient=http;
+
+                //生成工作线程
+                thread t(down_run,worker,ref(doneTaskQueue),ref(doneTaskNum));
+                //后台运行
+                t.detach();
+            }
         }
     }
 
@@ -132,9 +171,11 @@ int DownLoder::addTask(){
 
 int DownLoder::handleDoneTask(){
     int ret = SUCCESS;
+    queue<DoneTask> q;
     //集中释放，减少状态锁的抢占次数
-    while(!doneTaskQueue.empty()){
-        DoneTask task = doneTaskQueue.front();
+    doneTaskQueue.popALL(q);
+    while(ret==SUCCESS&&!q.empty()){
+        DoneTask task = q.front();
         PSMap::iterator it = busyServerMap.end();
         //检查id
         if (task.pid >=serverStates.size() || task.pid <0||
@@ -142,25 +183,59 @@ int DownLoder::handleDoneTask(){
                 task.mid <0)
         {
             ret = ERR_ILLEGAL_ID;
-            LOG(ERROR,ret,"错误的完成任务信息");
+            LOG(COERROR,ret,"错误的完成任务信息");
             break;
         }
-        else if(SUCCESS !=(ret = serverStates[task.pid].setFreeMachine(task.mid))){
-            LOG(ERROR,ret,"设置机器状态失败");
-            break;
+        else
+        {
+            switch (task.stat) {
+            case TASK_DONE://正常完成
+            {
+                if(SUCCESS !=(ret = serverStates[task.pid].setFreeMachine(task.mid))){
+                    LOG(COERROR,ret,"设置机器空闲状态失败");
+                }
+                //将服务节点从忙碌map中移除,并加入空闲优先队列
+                else if ((it=busyServerMap.find(task.pid))!=busyServerMap.end()){
+                    freeServerPriorityQueue.push(it->second);
+                    busyServerMap.erase(it);
+                }
+                break;
+            }
+            case TASK_DOING:
+            case TASK_REDO://重做
+            {
+                redoTaskQueue.push(task.trr);
+                break;
+            }
+            case TASK_SERVER_FAIL://机器不可服务
+            {
+                //添加重做任务
+                redoTaskQueue.push(task.trr);
+                //将机器移除
+                ret = serverStates[task.pid].removeMachine(task.mid);
+                if (ret!=SUCCESS){
+
+                }else if (serverStates[task.pid].aliveNum==0){
+                    //设置可服务的节点数减1
+                    totoalAlive--;
+                }
+                break;
+            }
+            default:
+                //不应该走到此处！
+                ASSERT(0);
+                break;
+            }
         }
-        //将服务节点从忙碌map中移除,并加入空闲优先队列
-        else if ((it=busyServerMap.find(task.pid))!=busyServerMap.end()){
-            freeServerPriorityQueue.push(it->second);
-            busyServerMap.erase(it);
-        }
-        doneTaskQueue.pop();
+        q.pop();
     }
 
     return ret;
 }
 
 int DownLoder::DownLoad(string url){
+    this->url=url;
+
     int ret=SUCCESS;
     if (SUCCESS!=(ret=getResourcesInfo(url))){
         LOG(ERR,ret,"无法获取资源信息，检查url地址是否合法");
@@ -171,42 +246,61 @@ int DownLoder::DownLoad(string url){
         //此处可以增加一个下载大小数据量的判断，当数据量较小不足66个分片时
         //或者指定了同时请求的节点数量时，初始化的任务数减少，
         //因为可能发太远，反而需要等待远端的地区结果
+        LOG(INFO,ret,"开始下载资源 begin download...");
+        int retryCount=3;   //重试次数
+        while(retryCount--){
+            //完成任务数
+            doneTaskNum = 0;
 
-        //初始化任务
-        for(int i=0;i<PROVINCE_NUM&&hasFreeServer()&&hasRemainTask();i++){
-            addTask();
-        }
-        //主线程循环检查
-        while(true){
-            //异常检查，无可用服务器
-            if (ret != SUCCESS ||checkDownException()){
-                ret = ERROR;
-                LOG(ERR,ret,"下载异常，停止下载");
+            //初始化任务
+            for(int i=0;i<PROVINCE_NUM&&hasFreeServer()&&hasRemainTask();i++){
+                addTask();
             }
-            //退出检查,没有剩余任务，并且所有线程结束
-            else if (!hasRemainTask()){
-                LOG(INFO,ret,"所有内容下载完成");
-                break;
-            }else{
-                //处理任务队列的完成内容
-                if (ret = handleDoneTask()){
-                    LOG(ERR,ret,"处理完成任务失败");
-                }
-                //添加新任务
-                while(hasRemainTask()&&hasFreeServer()&&ret==SUCCESS){
-                    ret = addTask();
-                }
-            }
-        }//end while
+            //主线程循环检查，轮询
+            while(true){
 
-        if (ret != SUCCESS){
-            //TODO
-            //失败处理，可能重试，重新从头开始下载
+                //TODO:当下载任务完成一定数据量后，计算平均完成时间，重调优先级？
+
+                //异常检查，无可用服务器
+                if (ret != SUCCESS ||SUCCESS!=(ret=checkDownException())){
+                    ret = COERROR;
+                    LOG(ERR,ret,"下载异常，停止下载");
+                    break;
+                }
+                //退出检查,没有剩余任务，并且所有线程结束
+                else if (!hasRemainTask()&&allThreadDone()){
+                    LOG(INFO,ret,"所有内容下载完成");
+                    break;
+                }else{
+                    //处理任务队列的完成内容
+                    if (ret = handleDoneTask()){
+                        LOG(ERR,ret,"处理完成任务失败");
+                    }
+                    //添加新任务
+                    while(hasRemainTask()&&hasFreeServer()&&ret==SUCCESS){
+                        ret = addTask();
+                    }
+                }
+            }//end while
+
+            if (ret != SUCCESS){
+                //TODO
+                //失败处理，可能重试，不可修复错误，重新从头开始下载
+            }
+            else{
+                //合并分片组合为完整的资源
+                if (SUCCESS != (ret=merge())){
+                    LOG(ERR,ret,"合并临时文件失败");
+                }else{
+                    LOG(INFO,ret,"合并临时文件成功");
+                    break;
+                }
+            }
         }
     }
     //清理环境
     clear();
-
+    LOG(INFO,ret,"下载资源结束 end download...");
     return ret;
 }
 

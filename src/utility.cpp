@@ -82,9 +82,10 @@ vector<vector<int>> init_provinces_neighbor_ralation(){
 
 /*
 广度遍历的方法按省市的邻近关系，确定访问省市的优先顺序
-注意的是，省市大小面积不一，实际顺序或许应该通过测试每个省市到各个省市机器的时间作为优先顺序
-但是，没有环境测试，所以请求数据的机器所在省市，通过遍历邻近省市作为下一个请求地址，
+根据请求数据的用户所在省市，通过遍历邻近省市作为下一个请求地址，
 当所有直接相邻的省市已经请求，则异常请求间接相邻的省市，直到所有的省市的服务节点的优先顺序确定。
+TODO：需要注意的是，省市大小面积不一，实际优先顺序或许应该通过测试每个省市到各个省市机器的时间作为优先顺序，
+可以根据各省市的平均请求数据的响应时间，重置访问优先顺序
 */
 
 int bfs_province_access_order(vector<vector<int>> &pnr,queue<int> &q,vector<ProvinceServerNode> &orders){
@@ -125,5 +126,45 @@ int get_province_access_order(vector<vector<int>> &pnr, int start,vector<Provinc
     if (SUCCESS!=(ret = bfs_province_access_order(pnr,q,orders))){
         LOG(ERR,ret,"广度遍历设置优先顺序失败");
     }
+    return ret;
+}
+
+int down_run(TaskWorker worker,threadSafeQueue<DoneTask> & doneQueue,atomic<uint64_t> & doneTaskNum){
+
+    int ret = SUCCESS;
+    //完成任务信息
+    DoneTask task;
+    task.pid=worker.pid;
+    task.mid=worker.mid;
+    task.trr=worker.trr;
+    task.stat=TASK_DOING;
+    //下载
+    if (SUCCESS!=(ret = worker.handleDownRequests())){
+        LOG(ERR,ret,"下载失败");
+        //TODO根据错误类型，设置状态
+        task.stat=TASK_SERVER_FAIL;//超时 TASK_REDO
+    }else{
+        //正常完成
+        task.stat=TASK_DONE;
+        //设置任务完成时间
+        task.times=worker.httpClient->downTime;
+        LOG(INFO,ret,"下载成功");
+    }
+    //向完成队列添加一个done/fail/redo DoneTask,提前生成下一个任务
+    doneQueue.push(task);
+
+    if (ret!=SUCCESS){
+    }
+    else if(SUCCESS!= (ret = worker.store())){
+        LOG(WARN,ret,"本地写数据失败");
+        task.stat=TASK_REDO;
+        //向完成队列再添加一个redo DoneTask,重新下载
+        doneQueue.push(task);
+    }else{
+        LOG(INFO,ret,"写数据到磁盘成功");
+        //修改完成成功的任务数
+        doneTaskNum++;
+    }
+
     return ret;
 }

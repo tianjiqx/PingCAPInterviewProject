@@ -1,5 +1,6 @@
 
 #include "utility.h"
+#include "down_loder.h"
 
 /*
  * 功能实现
@@ -22,15 +23,14 @@
 
 int main(){
 
-
     vector<vector<int>> v = init_provinces_neighbor_ralation();
 
-    //    for (int i=0;i<v.size();i++){
-    //        for (int j=0;j<v[i].size();j++){
-    //            cout<<v[i][j]<<" ";
-    //        }
-    //        cout<<endl;
-    //   }
+//        for (int i=0;i<v.size();i++){
+//            for (int j=0;j<v[i].size();j++){
+//                cout<<v[i][j]<<" ";
+//            }
+//            cout<<endl;
+//       }
 
     vector<ProvinceServerNode> po(PROVINCE_NUM);
 
@@ -40,11 +40,32 @@ int main(){
 
     get_province_access_order(v,1,po);
 
-    //    cout<<"顺序\n";
+    vector<ProvinceServerState> pss;
+    for (int i=0;i< PROVINCE_NUM ;i++){
+        ProvinceServerState p;
+        p.ps=po[i];
+        for (int j=0;j<MACHINE_NUM;j++){
+             p.freeMachinesIndex.push(j);
+             MachineNode m(p.ps.id,j,id2ip(p.ps.id,j));
+             p.machines.push_back(m);
+        }
+        p.aliveNum=p.freeMachinesIndex.size();
+        p.freeNum=p.freeMachinesIndex.size();
+        pss.push_back(p);
+    }
 
-//        for (int i=0;i< PROVINCE_NUM ;i++){
-//            cout<<po[i].id<<" "<< po[i].order<<endl;
-//        }
+//    for (int i=0;i< PROVINCE_NUM ;i++){
+//        cout<<po[i].id<<" "<< po[i].order<<endl;
+//    }
+
+
+    log_level=INFO;
+
+    DownLoder d1;
+    string url="pingcap.tar.gz";
+    d1.initDownLoder(pss);
+    d1.DownLoad(url);
+
 
 
     return 0;

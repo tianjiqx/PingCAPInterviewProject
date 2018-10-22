@@ -1,9 +1,12 @@
 #ifndef DOWN_LODER_H_
 #define DOWN_LODER_H_
 
+#include<atomic>
 #include "task.h"
 #include "province_server_node.h"
 #include "http_client.h"
+#include "thread_safe_queue.h"
+
 
 typedef map<int,ProvinceServerNode> PSMap;
 typedef map<string,HttpClient*> HCMap;
@@ -14,9 +17,12 @@ typedef map<string,HttpClient*> HCMap;
 class DownLoder{
 private:
 
+    string url; //资源地址
+
     priority_queue<ProvinceServerNode> freeServerPriorityQueue;   //空闲访问省市服务节点优先队列
     vector<ProvinceServerState> serverStates;   //服务节点的状态
     PSMap busyServerMap;    //忙碌、或者不在线的服务节点，用于处理节点恢复后，快速查找加入正常空闲队列，扩展功能
+    uint64_t totoalAlive;   //总共在线的服务机器数
 
     HCMap httpClientMap;    //HttpClient的hash map
 
@@ -27,7 +33,10 @@ private:
     queue<TaskReqestRange> redoTaskQueue;  //失败任务，重做任务队列
 
     //为了使工作线程无状态，减少耦合，建立已经完成任务队列，处理后续工作
-    queue<DoneTask> doneTaskQueue;  //已完成任务队列
+    threadSafeQueue<DoneTask> doneTaskQueue;  //已完成任务队列
+
+    uint64_t taskNum;
+    atomic<uint64_t> doneTaskNum;   //已经完成的任务数，用于检查是否所有的任务已经完成，结束
 
     uint64_t startTime; //下载开始时间
     uint64_t timeOut;   //下载超时时间，超时后停止自动退出下载
@@ -48,9 +57,8 @@ public:
      * @param m [out]
      * @return 错误码
      */
-    int popMachineNode(MachineNode *m);
+    int popMachineNode(MachineNode *&m);
 
-    int pushMachineNode();
 
 
     /**
@@ -75,6 +83,10 @@ public:
         return remainTask.len!=0||!redoTaskQueue.empty();
     }
 
+    bool allThreadDone(){
+        return doneTaskNum==taskNum;
+    }
+
     /**
      * @brief hasFreeServer
      * 检查是否有空闲服务节点
@@ -88,20 +100,23 @@ public:
      * 下载异常检查
      * @return
      */
-    bool checkDownException(){
-        bool ret = false;
+    int checkDownException(){
+        int ret = SUCCESS;
         //检查是否所有服务节点都已经不可服务
+         if (totoalAlive==0){
+            ret = ERR_FAIL_SERVER;
+            LOG(WARN,ret,"服务器全部不可达");
+         }
         return ret;
     }
 
     /**
      * @brief initDownLoder
      * 初始化下载器
-     * @param psv [in] 省市服务节点数组
      * @param pss [in] 省市服务节点状态数组
      * @return 错误码
      */
-    int initDownLoder(vector<ProvinceServerNode> & psv, vector<ProvinceServerState> &pss);
+    int initDownLoder(vector<ProvinceServerState> &pss);
 
     /**
      * @brief getResourcesInfo
@@ -112,6 +127,15 @@ public:
     int getResourcesInfo(string url);
 
     /**
+     * @brief getHttpclient
+     * 获取一个Httpclient
+     * @param ip [in]
+     * @param http [out] 维持的客户端
+     * @return
+     */
+    int getHttpclient(string ip, HttpClient *&http);
+
+    /**
      * @brief DownLoad
      * 下载资源，入口
      * @param url [in] 资源地址
@@ -120,12 +144,26 @@ public:
     int DownLoad(string url);
 
     /**
+     * @brief merge
+     * 合并临时文件
+     * @return
+     */
+    int merge();
+
+    /**
      * @brief clear
      * 清理环境
      */
     void clear(){
         //TODO
         //清理下载器的各种状态，释放资源等等
+        for(HCMap::iterator it=httpClientMap.begin();it!=httpClientMap.end();it++){
+            if(it->second!=NULL){
+                delete it->second;
+                it->second=NULL;
+            }
+        }
+        httpClientMap.clear();
     }
 
 };

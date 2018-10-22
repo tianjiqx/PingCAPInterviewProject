@@ -7,23 +7,72 @@
 
 struct MachineNode{
     int pid;     //省市id
-    int mid;     //机器di
+    int mid;     //机器id
     string ip;  //主机IP
     int stat;   //主机服务状态，HTTP状态码，正常，繁忙，无法连接,无请求资源等
     int doing;   //工作状态
 
+    MachineNode(){
+        this->pid=0;
+        this->mid=0;
+        this->ip="10.11.1.1";
+        this->stat=MACHINE_NORMAL;
+        this->doing=0;
+    }
+    MachineNode(int pid,int mid,string ip){
+        this->pid=pid;
+        this->mid=mid;
+        this->ip=ip;
+        this->stat=MACHINE_NORMAL;
+        this->doing=0;
+    }
+
     void print() const{
-        char buf[256];
-        sprintf(buf,"pid=%d mid=%d ip=%s stat=%d doing=%d",pid,mid,ip.data(),stat,doing);
+        char buf[128];
+        sprintf(buf,"机器信息:pid=%d mid=%d ip=%s stat=%d doing=%d",pid,mid,ip.c_str(),stat,doing);
         LOG(INFO,SUCCESS,buf);
     }
 };
+
+/**
+ * @brief The ProvinceServerNode struct
+ * 省市服务节点
+ */
+//节约写代码时间，定义为结构体，不定义为类
+struct ProvinceServerNode{
+    int id;     //省市的id
+    int order;  //省市的顺序
+
+    ProvinceServerNode(){}
+    ProvinceServerNode(int i,int o){
+        id=i;
+        order=o;
+    }
+
+    friend bool operator < (ProvinceServerNode a, ProvinceServerNode b)
+    {
+        return a.order > b.order;   //order值小的，优先级更高。
+    }
+    /**
+     * @brief print
+     * 打印节点信息
+     */
+    void print() const {
+        char buf[256];
+        sprintf(buf,"id=%d order=%d",id,order);
+        LOG(INFO,SUCCESS,buf);
+    }
+};
+
+
 
 /**
  * @brief The ProvinceServerState struct
  * 省市服务节点的状态，将状态分离是为了避免遍历优先队列，修改空闲服务节点的机器的状态
  */
 struct ProvinceServerState{
+
+    ProvinceServerNode ps;
 
     int aliveNum;   //可用主机数,服务器状态正常
     int freeNum;    //空闲的机器数
@@ -36,6 +85,7 @@ struct ProvinceServerState{
      * 打印状态信息
      */
     void print() const{
+        ps.print();
         char buf[256];
         sprintf(buf,"aliveNum=%d freeNum=%d",aliveNum,freeNum);
         LOG(INFO,SUCCESS,buf);
@@ -50,14 +100,14 @@ struct ProvinceServerState{
      * @param m [out] 空闲机器
      * @return
      */
-    int getFreeMachine(MachineNode * m){
+    int getFreeMachine(MachineNode *& m){
         int ret = SUCCESS;
         //检查
         if(aliveNum==0||freeNum==0||
                 freeMachinesIndex.empty()){
             ret = ERR_QUEUE_EMPTY;
         }else{
-            m = &machines[freeMachinesIndex.front()];
+            m = &(machines[freeMachinesIndex.front()]);
             if (m->doing){
                 ret = ERR_WRONG_STASTE;
                 LOG(WARN,ret,"机器工作状态错误，并未在空闲状态");
@@ -121,35 +171,6 @@ struct ProvinceServerState{
 };
 
 
-/**
- * @brief The ProvinceServerNode struct
- * 省市服务节点
- */
-//节约写代码时间，定义为结构体，不定义为类
-struct ProvinceServerNode{
-    int id;     //省市的id
-    int order;  //省市的顺序
-
-    ProvinceServerNode(){}
-    ProvinceServerNode(int i,int o){
-        id=i;
-        order=o;
-    }
-
-    friend bool operator < (ProvinceServerNode a, ProvinceServerNode b)
-    {
-        return a.order > b.order;   //order值小的，优先级更高。
-    }
-    /**
-     * @brief print
-     * 打印节点信息
-     */
-    void print() const {
-        char buf[256];
-        sprintf(buf,"id=%d order=%d",id,order);
-        LOG(INFO,SUCCESS,buf);
-    }
-};
 
 
 #endif
