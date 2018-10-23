@@ -168,3 +168,10 @@ int down_run(TaskWorker worker,threadSafeQueue<DoneTask> & doneQueue,atomic<uint
 
     return ret;
 }
+
+int64_t get_current_time()
+{
+    timeval tv;
+    gettimeofday(&tv,NULL);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}

@@ -59,8 +59,6 @@ public:
      */
     int popMachineNode(MachineNode *&m);
 
-
-
     /**
      * @brief addTask
      * 增加一个任务到线程池

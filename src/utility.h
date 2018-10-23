@@ -4,6 +4,7 @@
 #include "province_server_node.h"
 #include "task.h"
 #include "thread_safe_queue.h"
+#include <sys/time.h>
 
 /**
  * @brief init_provinces_neighbor_ralation
@@ -41,6 +42,15 @@ int get_province_access_order(vector<vector<int>> &pnr, int start,vector<Provinc
  * @return
  */
 int down_run(TaskWorker worker, threadSafeQueue<DoneTask> & doneQueue, atomic<uint64_t> &doneTaskNum);
+
+/**
+ * @brief get_current_time
+ * 获取时间戳，毫秒
+ * @return
+ */
+int64_t get_current_time();
+
+
 
 
 #endif // UTILITY_H_

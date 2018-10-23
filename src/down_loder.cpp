@@ -27,8 +27,9 @@ int DownLoder::popMachineNode(MachineNode *& m){
         LOG(INFO,ret,"无空闲服务节点");
     }else{
         //是否找到可用的空闲节点
-        bool succ = true;
-        do{
+        bool succ = false;
+        while(!succ&&!freeServerPriorityQueue.empty())
+        {
             succ= true;
             const ProvinceServerNode & psn  = freeServerPriorityQueue.top();
             if (psn.id >= serverStates.size() || psn.id <0){
@@ -59,7 +60,7 @@ int DownLoder::popMachineNode(MachineNode *& m){
                 //移除空闲队列
                 freeServerPriorityQueue.pop();
             }
-        }while(!succ||freeServerPriorityQueue.empty());
+        };
         if(!succ){
             ret =  ERR_QUEUE_EMPTY;
             LOG(INFO,ret,"无空闲服务节点");
@@ -91,10 +92,12 @@ int DownLoder::getResourcesInfo(string url){
     remainTask.start=0;
     //假设资源2GB
     //remainTask.len=2*1024*1024*1024L;   //2GB
-    remainTask.len=2*1024*1024L;   //2MB
+    //remainTask.len=2*1024*1024L;   //2MB
+    remainTask.len=2*1024*1024*64L;   //128MB
 
     //初始化任务数
     taskNum=ceil(remainTask.len*1.0/MAX_HTTP_BODY_SIZE);
+    cout<<"\b任务数:"<<taskNum<<endl;
     char buf[100];
     sprintf(buf,"任务数%d",taskNum);
     LOG(INFO,ret,buf);
@@ -121,9 +124,9 @@ int DownLoder::getHttpclient(string ip,HttpClient *& http){
         //根据order，设置一个伪下载时间
         int pid,mid,order;
         ip2id(ip,pid,mid);
-        order = serverStates[pid].ps.order+1;
-        http->downTime=order/5*100+order%5;
-
+        order = serverStates[pid].ps.order;
+        http->downTime=100+order/5*100;//+order%5*10
+        //http->downTime=100;
         httpClientMap.insert(HCMap::value_type(ip,http));
     }
     return ret;
@@ -199,6 +202,10 @@ int DownLoder::handleDoneTask(){
                     freeServerPriorityQueue.push(it->second);
                     busyServerMap.erase(it);
                 }
+                char buf[100];
+                uint64_t doneNum=doneTaskNum;
+                sprintf(buf,"完成任务数%u",doneNum);
+                LOG(INFO,ret,buf);
                 break;
             }
             case TASK_DOING:
@@ -235,7 +242,7 @@ int DownLoder::handleDoneTask(){
 
 int DownLoder::DownLoad(string url){
     this->url=url;
-
+    int64_t start=get_current_time();
     int ret=SUCCESS;
     if (SUCCESS!=(ret=getResourcesInfo(url))){
         LOG(ERR,ret,"无法获取资源信息，检查url地址是否合法");
@@ -253,7 +260,7 @@ int DownLoder::DownLoad(string url){
             doneTaskNum = 0;
 
             //初始化任务
-            for(int i=0;i<PROVINCE_NUM&&hasFreeServer()&&hasRemainTask();i++){
+            for(int i=0;i<PROVINCE_NUM*MACHINE_NUM&&hasFreeServer()&&hasRemainTask();i++){
                 addTask();
             }
             //主线程循环检查，轮询
@@ -301,6 +308,10 @@ int DownLoder::DownLoad(string url){
     //清理环境
     clear();
     LOG(INFO,ret,"下载资源结束 end download...");
+    int64_t end=get_current_time();
+    char buf[100];
+    sprintf(buf,"耗时%d ms",(end-start));
+    LOG(INFO,ret,buf);
     return ret;
 }
 
