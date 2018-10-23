@@ -58,14 +58,13 @@ int main(){
 //        cout<<po[i].id<<" "<< po[i].order<<endl;
 //    }
 
-
+    //设置日志级别
     log_level=INFO;
 
     DownLoder d1;
     string url="pingcap.tar.gz";
     d1.initDownLoder(pss);
     d1.DownLoad(url);
-
 
 
     return 0;

@@ -52,5 +52,4 @@ int64_t get_current_time();
 
 
 
-
 #endif // UTILITY_H_

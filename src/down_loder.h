@@ -98,15 +98,7 @@ public:
      * 下载异常检查
      * @return
      */
-    int checkDownException(){
-        int ret = SUCCESS;
-        //检查是否所有服务节点都已经不可服务
-         if (totoalAlive==0){
-            ret = ERR_FAIL_SERVER;
-            LOG(WARN,ret,"服务器全部不可达");
-         }
-        return ret;
-    }
+    int checkDownException();
 
     /**
      * @brief initDownLoder
@@ -152,17 +144,7 @@ public:
      * @brief clear
      * 清理环境
      */
-    void clear(){
-        //TODO
-        //清理下载器的各种状态，释放资源等等
-        for(HCMap::iterator it=httpClientMap.begin();it!=httpClientMap.end();it++){
-            if(it->second!=NULL){
-                delete it->second;
-                it->second=NULL;
-            }
-        }
-        httpClientMap.clear();
-    }
+    void clear();
 
 };
 

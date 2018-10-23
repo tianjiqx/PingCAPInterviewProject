@@ -16,7 +16,6 @@ void LOG(int level,int errCode,string errMsg){
 }
 
 
-
 void str2int(int &int_temp,const string &string_temp)
 {
     stringstream stream(string_temp);
