@@ -46,8 +46,8 @@ struct HttpClient{
          //TODO 发送http请求
          //捕获异常，设置对应错误码
 
-         Sleep(downTime);
-
+         //Sleep(downTime);
+         usleep(downTime*1000); 
          return ret;
     }
 };

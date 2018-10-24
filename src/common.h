@@ -9,7 +9,8 @@
 #include<string>
 
 #include<atomic>
-#include<windows.h>
+//#include<windows.h>  //for windows
+#include <unistd.h> //for linux
 #include<assert.h>
 #include<sstream>
 
@@ -30,8 +31,8 @@ const uint64_t MAX_QUEUE_SIZE = 1000; //最大任务队列长度,超过后不再
 #define ERR_NULL_PTR -2     //空指针错误
 #define ERR_ILLEGAL_ID -3   //非法的ID
 #define ERR_WRONG_STASTE -4 //错误的状态
-#define ERR_FAIL_SERVER -4 //服务器机器工作失败
-#define ERR_ASSERT -5   //断言错误
+#define ERR_FAIL_SERVER -5 //服务器机器工作失败
+#define ERR_ASSERT -6   //断言错误
 
 
 

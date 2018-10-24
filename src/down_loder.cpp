@@ -1,7 +1,7 @@
 #include "down_loder.h"
 #include<thread>
 #include<math.h>
-#include<utility.h>
+#include "utility.h"
 
 int DownLoder::produceTaskReqestRange(TaskReqestRange & trr){
     int ret = SUCCESS;
@@ -79,7 +79,9 @@ int DownLoder::initDownLoder(vector<ProvinceServerState> &pss){
     //初始化服务节点的状态
     for(int i=0;i<pss.size();i++){
         serverStates.push_back(pss[i]);
+        totoalAlive++;
     }
+    
 
     return ret;
 }

@@ -111,7 +111,7 @@ int bfs_province_access_order(vector<vector<int>> &pnr,queue<int> &q,vector<Prov
     //检查visited所有项都应该置为1,若存在非1则说明邻居关系可能存在单边，输入错误
     for(int i=0;i<size;i++){
         if (!(1&visited[i])){
-            ret = ERROR;
+            ret = COERROR;
         }
     }
 
