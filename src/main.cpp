@@ -24,14 +24,6 @@
 int main(){
 
     vector<vector<int>> v = init_provinces_neighbor_ralation();
-
-//        for (int i=0;i<v.size();i++){
-//            for (int j=0;j<v[i].size();j++){
-//                cout<<v[i][j]<<" ";
-//            }
-//            cout<<endl;
-//       }
-
     vector<ProvinceServerNode> po(PROVINCE_NUM);
 
     for (int i=0;i< PROVINCE_NUM ;i++){
@@ -53,10 +45,6 @@ int main(){
         p.freeNum=p.freeMachinesIndex.size();
         pss.push_back(p);
     }
-
-//    for (int i=0;i< PROVINCE_NUM ;i++){
-//        cout<<po[i].id<<" "<< po[i].order<<endl;
-//    }
 
     //设置日志级别
     log_level=INFO;
