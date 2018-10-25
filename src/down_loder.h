@@ -42,7 +42,12 @@ private:
     uint64_t timeOut;   //下载超时时间，超时后停止自动退出下载
 
 public:
-
+    DownLoder(){
+        taskNum=0;
+        doneTaskNum=0;
+        timeOut=1000000; //1000s
+        totoalAlive=0;
+    }
     /**
      * @brief produceTaskReqestRange
      * 生成新的任务的请求范围
@@ -146,6 +151,39 @@ public:
      */
     void clear();
 
+    /**
+    * @brief DownLoder::getRedoTaskQueue
+    * 获取重做任务队列，用于单元测试
+    * @return
+    */
+    queue<TaskReqestRange> &getRedoTaskQueue();
+    /**
+     * @brief getRemainTask
+     * 获取剩余任务状态，用于单元测试
+     * @return
+     */
+    TaskReqestRange &getRemainTask();
+    /**
+     * @brief getFreeServerPriorityQueue
+     * 获取空闲队里，用于单元测试
+     * @return
+     */
+    priority_queue<ProvinceServerNode> &getFreeServerPriorityQueue();
+    /**
+     * @brief getDoneTaskQueue
+     * 获取完成队列
+     * @return
+     */
+    threadSafeQueue<DoneTask>& getDoneTaskQueue();
+    /**
+     * @brief getDoneTaskNum
+     * 获取成功完成任务数
+     * @return
+     */
+    atomic<uint64_t> &getDoneTaskNum();
+
+    uint64_t getTaskNum() const;
+    void setTaskNum(const uint64_t &value);
 };
 
 #endif // DOWN_LODER_H

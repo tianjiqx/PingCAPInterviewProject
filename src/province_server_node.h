@@ -49,10 +49,15 @@ struct ProvinceServerNode{
         order=o;
     }
 
-    friend bool operator < (ProvinceServerNode a, ProvinceServerNode b)
-    {
+    friend bool operator < (ProvinceServerNode a, ProvinceServerNode b){
         return a.order > b.order;   //order值小的，优先级更高。
     }
+
+    friend bool operator == (ProvinceServerNode a, ProvinceServerNode b){
+      return a.id==b.id&&a.order==b.order;
+    }
+
+
     /**
      * @brief print
      * 打印节点信息

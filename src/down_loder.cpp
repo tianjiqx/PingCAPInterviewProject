@@ -99,9 +99,8 @@ int DownLoder::getResourcesInfo(string url){
 
     //初始化任务数
     taskNum=ceil(remainTask.len*1.0/MAX_HTTP_BODY_SIZE);
-    cout<<"\b任务数:"<<taskNum<<endl;
     char buf[100];
-    sprintf(buf,"任务数%d",taskNum);
+    sprintf(buf,"任务数%llu",taskNum);
     LOG(INFO,ret,buf);
 
     return ret;
@@ -120,6 +119,10 @@ int DownLoder::checkDownException(){
      if (totoalAlive==0){
         ret = ERR_FAIL_SERVER;
         LOG(WARN,ret,"服务器全部不可达");
+     }
+     else if (get_current_time()>(startTime+timeOut)){
+         ret = ERR_TIMEOUT;
+          LOG(WARN,ret,"下载超时");
      }
     return ret;
 }
@@ -154,6 +157,34 @@ int DownLoder::getHttpclient(string ip,HttpClient *& http){
         httpClientMap.insert(HCMap::value_type(ip,http));
     }
     return ret;
+}
+
+queue<TaskReqestRange> &DownLoder::getRedoTaskQueue(){
+    return redoTaskQueue;
+}
+
+TaskReqestRange & DownLoder::getRemainTask(){
+    return remainTask;
+}
+
+priority_queue<ProvinceServerNode> &DownLoder::getFreeServerPriorityQueue(){
+    return freeServerPriorityQueue;
+}
+
+threadSafeQueue<DoneTask> &DownLoder::getDoneTaskQueue(){
+    return doneTaskQueue;
+}
+
+atomic<uint64_t> &DownLoder::getDoneTaskNum(){
+    return doneTaskNum;
+}
+
+uint64_t DownLoder::getTaskNum() const{
+    return taskNum;
+}
+
+void DownLoder::setTaskNum(const uint64_t &value){
+    taskNum = value;
 }
 
 int DownLoder::addTask(){
@@ -210,7 +241,7 @@ int DownLoder::handleDoneTask(){
                 task.mid <0)
         {
             ret = ERR_ILLEGAL_ID;
-            LOG(COERROR,ret,"错误的完成任务信息");
+            LOG(COMMON_ERROR,ret,"错误的完成任务信息");
             break;
         }
         else
@@ -219,7 +250,7 @@ int DownLoder::handleDoneTask(){
             case TASK_DONE://正常完成
             {
                 if(SUCCESS !=(ret = serverStates[task.pid].setFreeMachine(task.mid))){
-                    LOG(COERROR,ret,"设置机器空闲状态失败");
+                    LOG(COMMON_ERROR,ret,"设置机器空闲状态失败");
                 }
                 //将服务节点从忙碌map中移除,并加入空闲优先队列
                 else if ((it=busyServerMap.find(task.pid))!=busyServerMap.end()){
@@ -265,9 +296,10 @@ int DownLoder::handleDoneTask(){
 }
 
 int DownLoder::DownLoad(string url){
+    int ret=SUCCESS;
     this->url=url;
     int64_t start=get_current_time();
-    int ret=SUCCESS;
+    this->startTime=start;
     if (SUCCESS!=(ret=getResourcesInfo(url))){
         LOG(ERR,ret,"无法获取资源信息，检查url地址是否合法");
     }else if(freeServerPriorityQueue.empty()){
@@ -294,7 +326,7 @@ int DownLoder::DownLoad(string url){
 
                 //异常检查，无可用服务器
                 if (ret != SUCCESS ||SUCCESS!=(ret=checkDownException())){
-                    ret = COERROR;
+                    ret = COMMON_ERROR;
                     LOG(ERR,ret,"下载异常，停止下载");
                     break;
                 }

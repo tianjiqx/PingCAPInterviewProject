@@ -39,6 +39,7 @@ struct TaskWorker{
         this->pid=pid;
         this->mid=mid;
         this->trr=trr;
+        this->httpClient=NULL;
     }
 
     /**

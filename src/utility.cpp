@@ -90,12 +90,21 @@ TODO：需要注意的是，省市大小面积不一，实际优先顺序或许�
 
 int bfs_province_access_order(vector<vector<int>> &pnr,queue<int> &q,vector<ProvinceServerNode> &orders){
     int ret = SUCCESS;
+
+    if (pnr.size()!=orders.size()){
+      ret=COMMON_ERROR;
+    }
+
     int order=0;    //省市访问顺序、优先级
     int size = orders.size();
     bool visited[size]={0};  //标记节点是否被访问
     visited[q.front()]=1;   //标记起始节点已经被访问
-    while(!q.empty()){
+    while(ret==SUCCESS&&!q.empty()){
         int idx=q.front();
+        if (idx <0 || idx >= size){
+          ret=ERR_ILLEGAL_ID;
+          break;
+        }
         q.pop();
         orders[idx].order=order++;    //设置优先级
         int i=0,n=pnr[idx].size();
@@ -109,9 +118,9 @@ int bfs_province_access_order(vector<vector<int>> &pnr,queue<int> &q,vector<Prov
     }
 
     //检查visited所有项都应该置为1,若存在非1则说明邻居关系可能存在单边，输入错误
-    for(int i=0;i<size;i++){
+    for(int i=0;i<size&&ret==SUCCESS;i++){
         if (!(1&visited[i])){
-            ret = COERROR;
+            ret = COMMON_ERROR;
         }
     }
 

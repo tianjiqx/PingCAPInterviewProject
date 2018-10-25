@@ -53,6 +53,16 @@ public:
             q.pop();
         }
     }
+    /**
+     * @brief size
+     * 队列大小
+     * @return
+     */
+    int size(){
+      lock_guard<mutex> lk(mut);
+      return q.size();
+    }
+
 };
 
 
